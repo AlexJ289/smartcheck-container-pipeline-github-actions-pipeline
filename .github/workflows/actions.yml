@@ -1,0 +1,53 @@
+name: smartcheck-container-pipeline-github-actions
+
+on: 
+  push:
+    paths:
+      - Dockerfile
+
+jobs:
+  build-push-scan:
+    runs-on: ubuntu-latest
+    env:
+      ECR_REGISTRY: ${{ secrets.REGISTRY }}
+      REPOSITORY: smartchecktest
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      
+    - name: Build & tag docker image
+      run: |
+        docker build -t $ECR_REGISTRY/$REPOSITORY:$IMAGE_TAG .
+      
+    - name: Deep Security Smart Check
+      uses: deep-security/smartcheck-scan-action@v1.1.0
+      with:
+        # Mandatory
+        DSSC_IMAGE_NAME: ${{ env.ECR_REGISTRY }}/${{ env.REPOSITORY }}:${{ env.IMAGE_TAG }}
+        DSSC_SMARTCHECK_HOST: ${{ secrets.DSSC_HOST }}
+        DSSC_SMARTCHECK_USER: ${{ secrets.DSSC_USER }}
+        DSSC_SMARTCHECK_PASSWORD: ${{ secrets.DSSC_PASSWORD }}
+        DSSC_IMAGE_PULL_AUTH: '{"aws":{"region":"us-east-1","accessKeyID":"${{ secrets.AWS_ACCESS_KEY_ID }}","secretAccessKey":"${{ secrets.AWS_SECRET_ACCESS_KEY }}"}}'
+        # Optional
+        DSSC_INSECURE_SKIP_TLS_VERIFY: true
+        DSSC_INSECURE_SKIP_REGISTRY_TLS_VERIFY: true
+        DSSC_PREREGISTRY_SCAN: true
+        DSSC_PREREGISTRY_USER: registryuser
+        DSSC_PREREGISTRY_PASSWORD: ${{ secrets.DSSC_REGISTRYPW }}
+        DSSC_FINDINGS_THRESHOLD: '{"malware": 0, "vulnerabilities": { "defcon1": 0, "critical": 0, "high": 0 }, "contents": { "defcon1": 0, "critical": 0, "high": 0 }, "checklists": { "defcon1": 0, "critical": 0, "high": 0 }}'
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Push image to ECR
+      run: |
+        docker push $ECR_REGISTRY/$REPOSITORY:$IMAGE_TAG
