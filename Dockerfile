@@ -1,6 +1,6 @@
 FROM nginx:alpine
 COPY app/index.html /usr/share/nginx/html/index2.html
-#COPY app/banner.jpg /usr/share/nginx/html/banner2.jpg
+COPY app/banner.jpg /usr/share/nginx/html/banner2.jpg
 
 #FROM tomcat:7
 #RUN set -ex \
